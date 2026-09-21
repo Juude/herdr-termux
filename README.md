@@ -67,17 +67,27 @@ with the claude code pane, the sidebar and the socket api all working under Term
 
 ![herdr running on Termux/Android](assets/termux-android.jpg)
 
+installing needs no root at all: the [termux / android workflow](.github/workflows/termux-android.yml)
+cross-compiles this binary on a normal runner (Android NDK for bionic, no rooted device involved) and
+publishes it on every `termux-*` tag.
+
+```bash
+curl -fsSL -o ~/bin/herdr https://github.com/Juude/herdr-termux/releases/latest/download/herdr
+chmod +x ~/bin/herdr
+```
+
+building on the phone itself does want root, for one reason: zig's build runner hard-links into its
+cache, and android's `untrusted_app` SELinux domain denies `link(2)` — on `/data` (f2fs) and on
+`/storage/emulated/0` alike. the script below assembles a bionic sysroot from `$PREFIX`, runs the zig
+phase under `su`, and chowns and relabels the tree afterwards. zig 0.16.0 required.
+
 ```bash
 pkg install rust zig git
 git clone https://github.com/Juude/herdr-termux && cd herdr-termux
 scripts/termux-build.sh
 ```
 
-the script handles the two things that stop a plain `cargo build --release` here: zig cannot provide
-bionic libc (it assembles a sysroot from `$PREFIX` and points `ANDROID_NDK_HOME` at it), and zig's
-build runner hard-links into its cache, which android's `untrusted_app` SELinux domain denies — so the
-zig phase runs under `su` and the tree is chowned and relabelled for the app afterwards. zig 0.16.0 is
-required. `herdr update` declines on android: there is no bionic release asset to install.
+`herdr update` declines on android: upstream has no bionic release asset to install.
 
 ## docs
 

@@ -1,0 +1,103 @@
+name: Termux / Android
+
+# Cross-compiles herdr for Termux (aarch64-linux-android) on a normal runner:
+# the Android NDK supplies bionic for both zig's libghostty-vt build and rustc's
+# link step, so no rooted device is involved. Pushing a `termux-*` tag publishes
+# the binary and its checksum as a release, which is the no-root install path.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    tags: ["termux-*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: termux-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANDROID_API: 29
+  NDK_VERSION: r27c
+  RUST_TOOLCHAIN: 1.96.1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust for aarch64-linux-android
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+          rustup run "$RUST_TOOLCHAIN" rustup target add aarch64-linux-android
+
+      - name: Install Zig 0.16.0
+        uses: vercel-labs/setup-zig@83c1594f26b86da8a9a8ddd9b5ee5f3af0f96943 # v1.0.2
+        with:
+          version: 0.16.0
+
+      - name: Install Android NDK
+        run: |
+          curl -fsSL -o /tmp/ndk.zip \
+            "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
+          unzip -q /tmp/ndk.zip -d /opt
+          echo "ANDROID_NDK_HOME=/opt/android-ndk-${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: |
+          toolchain="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+          clang="$toolchain/bin/aarch64-linux-android${ANDROID_API}-clang"
+          {
+            echo "CC_aarch64_linux_android=$clang"
+            echo "AR_aarch64_linux_android=$toolchain/bin/llvm-ar"
+            echo "RANLIB_aarch64_linux_android=$toolchain/bin/llvm-ranlib"
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$clang"
+            # Android 15+ devices can use 16 KiB pages.
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384"
+            echo "NDK_TOOLCHAIN=$toolchain"
+          } >> "$GITHUB_ENV"
+          cargo +"$RUST_TOOLCHAIN" build --release --locked --target aarch64-linux-android
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp target/aarch64-linux-android/release/herdr dist/herdr
+          "$NDK_TOOLCHAIN/bin/llvm-strip" dist/herdr
+          (cd dist && sha256sum herdr > herdr.sha256)
+          file dist/herdr
+          ls -lh dist
+
+      - name: Check it is a bionic binary
+        run: |
+          readelf -d dist/herdr | grep NEEDED
+          readelf -d dist/herdr | grep -q 'Shared library: \[libc.so\]'
+          ! readelf -d dist/herdr | grep -q 'libc++\|libgcc\|libstdc++'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: herdr-aarch64-linux-android
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/termux-')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body: |
+            herdr for Termux / Android (aarch64-linux-android), cross-compiled from
+            ${{ github.sha }}.
+
+            install without root:
+
+            ```bash
+            curl -fsSL -o ~/bin/herdr \
+              https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/herdr
+            chmod +x ~/bin/herdr
+            herdr --version
+            ```

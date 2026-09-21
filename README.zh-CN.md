@@ -64,16 +64,26 @@ claude code 窗格、侧栏、socket api 都在 Termux 下正常工作。
 
 ![herdr 运行在 Termux/Android](assets/termux-android.jpg)
 
+安装完全不需要 root：[termux / android workflow](.github/workflows/termux-android.yml) 在普通
+runner 上用 Android NDK 交叉编译（不涉及任何需要 root 的设备），每打一个 `termux-*` tag 就发一次产物。
+
+```bash
+curl -fsSL -o ~/bin/herdr https://github.com/Juude/herdr-termux/releases/latest/download/herdr
+chmod +x ~/bin/herdr
+```
+
+在手机本机编译则需要 root，原因只有一个：zig 的构建进程会用硬链接写缓存，而 Android 的
+`untrusted_app` SELinux 域禁止 `link(2)`（`/data`（f2fs）和 `/storage/emulated/0` 都一样）。下面的脚本
+从 `$PREFIX` 拼出 bionic sysroot，把 zig 阶段放在 `su` 下跑，构建后再把属主和 SELinux 标签改回应用。
+需要 zig 0.16.0。
+
 ```bash
 pkg install rust zig git
 git clone https://github.com/Juude/herdr-termux && cd herdr-termux
 scripts/termux-build.sh
 ```
 
-脚本处理了直接 `cargo build --release` 会卡住的两点：zig 无法提供 bionic libc（脚本从 `$PREFIX` 拼出
-sysroot，并让 `ANDROID_NDK_HOME` 指向它）；zig 的构建进程会用硬链接写缓存，而 Android 的 `untrusted_app`
-SELinux 域禁止 `link(2)`，所以 zig 阶段在 `su` 下运行，构建后再把目录属主和 SELinux 标签改回应用。
-需要 zig 0.16.0。`herdr update` 在 Android 上会拒绝执行：没有可用的 bionic 发布产物。
+`herdr update` 在 Android 上会拒绝执行：上游没有可用的 bionic 发布产物。
 
 ## 文档
 
