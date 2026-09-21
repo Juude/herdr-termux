@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "android"))]
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
@@ -6,29 +7,42 @@ use tracing::warn;
 use crate::api::schema::InstalledPluginInfo;
 
 pub const MANIFEST_UNAVAILABLE_WARNING_PREFIX: &str = "manifest unavailable: ";
+#[cfg(not(target_os = "android"))]
 const REGISTRY_LOCK_FILE: &str = ".plugins.lock";
 
 fn registry_path() -> PathBuf {
     crate::config::config_dir().join("plugins.json")
 }
 
+#[cfg(not(target_os = "android"))]
 fn registry_lock_path() -> PathBuf {
     crate::config::config_dir().join(REGISTRY_LOCK_FILE)
 }
 
 fn with_registry_lock<T>(operation: impl FnOnce() -> std::io::Result<T>) -> std::io::Result<T> {
-    let lock_path = registry_lock_path();
-    if let Some(parent) = lock_path.parent() {
-        std::fs::create_dir_all(parent)?;
+    // Android's std has no `File::lock` (`lock() not supported`), and the herdr
+    // server is the only plugin-registry writer on a phone, so run unlocked
+    // there instead of failing every registry read and write.
+    #[cfg(target_os = "android")]
+    {
+        operation()
     }
-    let lock = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(lock_path)?;
-    lock.lock()?;
-    operation()
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let lock_path = registry_lock_path();
+        if let Some(parent) = lock_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let lock = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(lock_path)?;
+        lock.lock()?;
+        operation()
+    }
 }
 
 // Resolve the file link before replacing it, including a missing target in a

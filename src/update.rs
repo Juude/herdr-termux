@@ -2371,6 +2371,8 @@ fn homebrew_release_notes_body_from_manifest(
 // ---------------------------------------------------------------------------
 
 fn platform_target() -> (&'static str, &'static str) {
+    // Android is not a release-asset platform: a glibc `linux-aarch64` build
+    // cannot run under Termux, so report `unknown` and refuse self-update.
     let os = if cfg!(target_os = "linux") {
         "linux"
     } else if cfg!(target_os = "macos") {

@@ -174,6 +174,8 @@ impl RemotePlatform {
     }
 
     fn local() -> Self {
+        // A Termux/bionic binary is not the same platform as glibc linux, so
+        // never let it seed a remote machine's install.
         let os = if cfg!(target_os = "linux") {
             "linux"
         } else if cfg!(target_os = "macos") {

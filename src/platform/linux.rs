@@ -26,7 +26,11 @@ pub(crate) use super::unix_common::{
 #[cfg(test)]
 mod config_file_tests;
 
+// logind delay inhibitors are desktop-Linux only: android has no zbus
+// dependency and no systemd, so `platform/mod.rs` supplies a no-op stub there.
+#[cfg(target_os = "linux")]
 mod shutdown;
+#[cfg(target_os = "linux")]
 pub(crate) use shutdown::monitor_host_shutdown;
 
 const WSL_MARKER_ENV_VARS: &[&str] = &["WSL_DISTRO_NAME", "WSL_INTEROP"];
