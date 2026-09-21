@@ -24,6 +24,17 @@ ZIG_REQUIRED=0.16.0
 
 log() { printf '\033[1m[termux-build]\033[0m %s\n' "$*"; }
 
+# Phones here often carry a proxy env pointing at a local port that is down,
+# which breaks `pkg install` and cargo fetches. Drop it only when unreachable.
+proxy="${HTTPS_PROXY:-${https_proxy:-}}"
+if [ -n "$proxy" ]; then
+  hostport="${proxy#*://}"
+  if ! (exec 3<>"/dev/tcp/${hostport%%:*}/${hostport##*:}") 2>/dev/null; then
+    unset ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy
+    log "proxy $hostport unreachable — ignoring proxy env"
+  fi
+fi
+
 # magisk su resets HOME to "/", so the root phase has to fix its environment
 # before any path default below is derived from $HOME.
 if [ "${1:-}" = --root-phase ]; then
