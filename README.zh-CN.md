@@ -21,6 +21,10 @@
   <a href="https://x.com/herdrdev"><img src="https://img.shields.io/badge/follow-%40herdrdev-000000?logo=x&logoColor=white" alt="follow @herdrdev on X" /></a>
 </p>
 
+> **这是 [herdrdev/herdr](https://github.com/herdrdev/herdr) 的一个 fork。** 它让 herdr 在 Termux / Android
+> （aarch64-linux-android）上原生编译并运行，见 [termux / android](#termux--android)。上游不接受未经邀请的
+> pull request，所以这份移植留在这个仓库，不往上提。其余内容（安装脚本、文档）描述的都是上游。
+
 ---
 
 https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
@@ -52,6 +56,24 @@ herdr
 ```
 
 运行你的智能体、分割窗格，然后安心离开。`ctrl+b q` 分离，`herdr` 重新连接。[快速开始 →](https://herdr.dev/zh-cn/docs/quick-start/)
+
+## termux / android
+
+用 bionic 而不是 glibc：不需要 proot、qemu 或发行版容器。一个链接 `libc`/`libm`/`libdl` 的 rust 二进制，
+claude code 窗格、侧栏、socket api 都在 Termux 下正常工作。
+
+![herdr 运行在 Termux/Android](assets/termux-android.jpg)
+
+```bash
+pkg install rust zig git
+git clone https://github.com/Juude/herdr-termux && cd herdr-termux
+scripts/termux-build.sh
+```
+
+脚本处理了直接 `cargo build --release` 会卡住的两点：zig 无法提供 bionic libc（脚本从 `$PREFIX` 拼出
+sysroot，并让 `ANDROID_NDK_HOME` 指向它）；zig 的构建进程会用硬链接写缓存，而 Android 的 `untrusted_app`
+SELinux 域禁止 `link(2)`，所以 zig 阶段在 `su` 下运行，构建后再把目录属主和 SELinux 标签改回应用。
+需要 zig 0.16.0。`herdr update` 在 Android 上会拒绝执行：没有可用的 bionic 发布产物。
 
 ## 文档
 

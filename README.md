@@ -22,6 +22,11 @@
   <a href="https://x.com/herdrdev"><img src="https://img.shields.io/badge/follow-%40herdrdev-000000?logo=x&logoColor=white" alt="follow @herdrdev on X" /></a>
 </p>
 
+> **this is a fork of [herdrdev/herdr](https://github.com/herdrdev/herdr).** it builds and runs herdr
+> natively on Termux / Android (aarch64-linux-android) — see [termux / android](#termux--android).
+> upstream does not accept unsolicited pull requests, so the port stays here instead of being
+> offered there. everything else, including the installers and the docs, describes upstream.
+
 ---
 
 https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
@@ -54,6 +59,25 @@ herdr
 ```
 
 run your agents, split panes, walk away. `ctrl+b q` detaches, `herdr` reattaches. [quick start →](https://herdr.dev/docs/quick-start/)
+
+## termux / android
+
+bionic, not glibc: no proot, no qemu, no distro. one rust binary linked against `libc`/`libm`/`libdl`,
+with the claude code pane, the sidebar and the socket api all working under Termux.
+
+![herdr running on Termux/Android](assets/termux-android.jpg)
+
+```bash
+pkg install rust zig git
+git clone https://github.com/Juude/herdr-termux && cd herdr-termux
+scripts/termux-build.sh
+```
+
+the script handles the two things that stop a plain `cargo build --release` here: zig cannot provide
+bionic libc (it assembles a sysroot from `$PREFIX` and points `ANDROID_NDK_HOME` at it), and zig's
+build runner hard-links into its cache, which android's `untrusted_app` SELinux domain denies — so the
+zig phase runs under `su` and the tree is chowned and relabelled for the app afterwards. zig 0.16.0 is
+required. `herdr update` declines on android: there is no bionic release asset to install.
 
 ## docs
 
